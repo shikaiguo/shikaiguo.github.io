@@ -275,24 +275,28 @@
         $.ajax({
             url: "http://api.guoshikai.com/io/getArticleList",
             type: "post",
+            data: {
+                page: page + 1
+            },
             beforeSend: function(){
                 if(page >= total || "block" === $(".loading").css("display")){
                     return false;
                 }
-                page = 1;
                 $(".loading").fadeIn();
             },
             success: function(r){
                 $(".loading").hide();
-                if(r.page === r.total) {
-                    $(".tail").fadeIn();
-                }
                 if(0 !== r.code){
                     return false;
                 }
                 var tpl = $("#articleListItemTpl").text();
                 var html = juicer(tpl, r.data);
                 $(".article-list>ul").append(html);
+                page = parseInt(r.data.page);
+                total = parseInt(r.data.total);
+                if(page === total) {
+                    $(".tail").fadeIn();
+                }
             }
         });
     }
