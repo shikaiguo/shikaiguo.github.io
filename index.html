@@ -78,7 +78,7 @@
             position: fixed;
             top: -1px;
             width: 100%;
-            box-shadow: 0 3px 3px #999;
+            box-shadow: 0 5px 5px #999;
         }
         .blank.nav-pin{
             height: 3rem;
@@ -137,7 +137,7 @@
         }
         div.article-list ul li{
             border: 1px solid #ccc;
-            box-shadow: .12rem .25rem .25rem #ddd;
+            box-shadow: 1px 2px 2px #ddd;
             word-wrap: break-word;
             margin-top:1rem;
             margin-bottom:1rem;
@@ -167,10 +167,10 @@
         div.article-list ul li div.bottom{
             color: #aaa;
             float: right;
+            font-size: .8rem;
         }
         div.article-list ul li div.bottom a{
             color: #333;
-            font-size: .8rem;
             text-decoration: none;
         }
         div.article-list ul li div.bottom a:hover{
@@ -256,7 +256,7 @@
     function scrollListener(){
         var documentScrollTop = $(document).scrollTop();
         /* nav */
-        navHeight = navHeight || $("nav").offset().top - 1;
+        navHeight = navHeight || $("nav").offset().top + 1;
         var f = documentScrollTop > navHeight;
         if(f !== navStatus){
             navStatus = f;
@@ -273,7 +273,7 @@
     var limit = 10; //max: 25
     function getArticleList(){
         $.ajax({
-            url: "http://api.guoshikai.com/io/getArticleList",
+            url: "//api.guoshikai.com/io/getArticleList",
             type: "post",
             data: {
                 page: page + 1
