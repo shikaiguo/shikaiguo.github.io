@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="/lib/css/normalize.min.css" rel="stylesheet">
+    <link href="/lib/css/common.css" rel="stylesheet">
+    <style for="canvas">
+        .canvas-div{
+            height: 4111px;
+            width: 1024px;
+            margin: 0 auto;
+        }
+        #canvas{
+            height: 4111px;
+            width: 1024px;
+            margin: 0 auto;
+        }
+        /*.paint{*/
+            /*background-color: #dddddd;*/
+            /*position: fixed;*/
+            /*width: 4rem;*/
+            /*height: 12rem;*/
+            /*right: 1rem;*/
+            /*top: 10rem;*/
+        /*}*/
+    </style>
+</head>
+<body>
+<div class="container">
+    <header role="banner">
+        <div class="back-top">
+            <i class="material-icons">keyboard_arrow_up</i>
+        </div>
+    </header>
+    <nav role="menu">
+        <ul>
+            <li>
+                <a href="/">IO</a>
+            </li>
+            <li>
+                <a href="/im.html">IM</a>
+            </li>
+            <li>
+                <a href="/draw.html">Draw</a>
+            </li>
+        </ul>
+    </nav>
+    <div class="blank"></div>
+    <div class="canvas-div">
+        <canvas id="canvas"></canvas>
+    </div>
+    <!--<div class="paint">-->
+        <!--<input>-->
+    <!--</div>-->
+    <footer>
+        <div class="copy left"><a href="http://guoshikai.com">guoshikai.com</a> &copy; 2016</div>
+        <div class="right">
+            <a href="https://github.com/shikaiguo">Github</a>
+        </div>
+    </footer>
+</div>
+<script src="/lib/js/jquery-3.1.1.min.js"></script>
+<script src="/lib/layer/layer.js"></script>
+<script>
+    $(function(){
+        $(document).scroll(scrollListener);
+        scrollListener();
+        webSocketInit();
+        $(".back-top").click(function(){
+            $("body").animate({ scrollTop: 0 }, 200);
+        });
+    });
+</script>
+<script>
+
+    var navHeight = false;
+    var navStatus = false;
+    function scrollListener(){
+        var documentScrollTop = $(document).scrollTop();
+        /* nav */
+        navHeight = navHeight || $("nav").offset().top + 1;
+        var f = documentScrollTop > navHeight;
+        if(f !== navStatus){
+            navStatus = f;
+            $("nav,.blank").toggleClass("nav-pin");
+            $(".back-top").fadeToggle(200);
+        }
+    }
+
+    var canvas;
+    var context;
+    function canvasInit(){
+        canvas = $("#canvas")[0];
+        canvas.setAttribute('width', $("#canvas").width());
+        canvas.setAttribute('height', $("#canvas").height());
+        if (!canvas.getContext) {
+            return;
+        }
+        context = canvas.getContext("2d");
+        context.lineJoin = "round";
+        context.lineWidth = 2;
+        $("#canvas").mousedown(function(e){
+            pointPush(e.pageX - this.offsetLeft, e.pageY - this.offsetTop);
+            down = true;
+        });
+        $("#canvas").mousemove(function(e){
+            if(true === down){
+                pointPush(e.pageX - this.offsetLeft, e.pageY - this.offsetTop, true);
+            }
+        });
+        $("#canvas").mouseup(function(e){
+            down = false;
+        });
+//        $("#canvas").mouseleave(function(e){
+//            down = false;
+//        });
+
+    }
+</script>
+<script>
+    var ws;
+    var url = "ws://api.guoshikai.com:64378";
+    var fd;
+    var color;
+    function webSocketInit(){
+        try {
+            ws = new WebSocket(url);
+            ws.onopen = function (f){
+                canvasInit();
+            }
+            ws.onmessage = function (f) {
+                var data = $.parseJSON(f.data);
+                if("undefined" !== typeof data.user){
+                    fd = data.user;
+                    color = data.color||"#000";
+                    return false;
+                }
+                redraw(data.fd, data);
+            }
+            ws.onclose = function (msg) {}
+            // 超时 5s内没连接成功就断开
+            setTimeout(function(){
+                if(1 !== ws.readyState){
+                    ws.close();
+                    var confirm = layer.confirm('WebSocket连接超时，是否重连？', {
+                        btn: ['是','否']
+                    }, function(){
+                        layer.close(confirm);
+                        webSocketInit();
+                    });
+                }
+            }, 5000);
+        }
+        catch (ex) {
+            console.log(ex);
+        }
+    }
+</script>
+<script>
+    var down = false;
+    var lastPointArr = [];
+
+    function pointPush(x, y, drag){
+        if("undefined" === typeof drag){
+            drag = false;
+        }
+        if("undefined" !== typeof lastPointArr[fd] && (Math.abs(lastPointArr[fd].x-x)+Math.abs(lastPointArr[fd].y-y) < 3)){
+            return false;
+        }
+        sendFrame({
+            x: x,
+            y: y,
+            d: drag,
+            c: color
+        })
+        redraw(fd, {
+            x: x,
+            y: y,
+            d: drag,
+            c: color
+        });
+    }
+
+    function redraw(fd, data){
+        context.strokeStyle = data.c;
+        context.beginPath();
+        if(data.d && "undefined" !== typeof lastPointArr[fd]){
+                context.moveTo(lastPointArr[fd].x, lastPointArr[fd].y);
+        }else{
+                context.moveTo(data.x-1, data.y);
+        }
+        context.lineTo(data.x, data.y);
+        context.closePath();
+        context.stroke();
+        lastPointArr[fd]=data;
+
+    }
+    // 统一发送方法
+    function sendFrame(f){
+        try {
+            ws.send(JSON.stringify(f));
+        }catch (ex) {
+            console.log(ex);
+        }
+    }
+</script>
+</body>
+</html>

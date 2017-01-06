@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="/lib/css/normalize.min.css" rel="stylesheet">
+    <link href="/lib/css/common.css" rel="stylesheet">
+    <style for="im">
+        .offline{
+            text-align: center;
+            height: 32rem;
+            line-height: 32rem;
+            display: none;
+        }
+        .offline a,.online a{
+            padding: .3rem .5rem;
+            background-color: #0D47A1;
+            border-radius: .3rem;
+            text-decoration: none;
+            color: #fff;
+        }
+        .offline a:hover,.online a:hover{
+            background-color: #1976D2;
+        }
+        .online{
+            text-align: center;
+            height: 3rem;
+            line-height: 3rem;
+            display: none;
+            border-bottom: 1px solid #ddd;
+        }
+        .main{
+            display: none;
+            height: 32rem;
+            margin: 1rem;
+        }
+        .main .online-list{
+            width: 14rem;
+            float: left;
+            height: 30rem;
+            border: 1px solid #ddd;
+        }
+        .main .chat-panel{
+            margin-left: 1rem;
+            width: calc(100% - 16rem - 2px);
+            float: left;
+        }
+        .main .chat-panel .chat-board{
+            height: 29rem;
+            padding: .5rem;
+            width: 100%;
+            border: 1px solid #ddd;
+            overflow: auto;
+        }
+        .main .chat-panel .chat-op{
+            margin-top: .5rem;
+        }
+        .main .chat-panel .chat-op #text{
+            width: calc(100% - 10rem);
+        }
+        .main .chat-panel .chat-op #send{
+            width: 5rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header role="banner">
+        <div class="back-top">
+            <i class="material-icons">keyboard_arrow_up</i>
+        </div>
+    </header>
+    <nav role="menu">
+        <ul>
+            <li>
+                <a href="/">IO</a>
+            </li>
+            <li>
+                <a href="/im.html">IM</a>
+            </li>
+            <li>
+                <a href="/draw.html">Draw</a>
+            </li>
+        </ul>
+    </nav>
+    <div class="blank"></div>
+    <div>
+        <div class="offline">
+            Please
+            <a href="javascript:;" data-type="login">Login in</a>
+            or
+            <a href="javascript:;" data-type="register">Sign up</a>
+        </div>
+        <div class="online">
+            Hello, <label></label>
+            <a href="javascript:;" data-type="logout">Sign out</a>
+        </div>
+        <div class="main">
+            <div class="online-list">
+                <ul></ul>
+                <script type="text/html" id="onlineListTpl">
+                    {@each list as row}
+                        <li>
+                            <a href="javascript:;" class="user u_${row}">${row}</a>
+                        </li>
+                    {@/each}
+                </script>
+            </div>
+            <div class="chat-panel">
+                <div class="chat-board"></div>
+                <div class="chat-op">
+                    <input id="text">
+                    <input type="button" value="send" id="send">
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <div class="copy left"><a href="http://guoshikai.com">guoshikai.com</a> &copy; 2016</div>
+        <div class="right">
+            <a href="https://github.com/shikaiguo">Github</a>
+        </div>
+    </footer>
+</div>
+<script src="/lib/js/jquery-3.1.1.min.js"></script>
+<script src="/lib/layer/layer.js"></script>
+<script src="/lib/juicer/juicer-min.js"></script>
+<script src="/lib/js/js.cookie-2.1.3.min.js"></script>
+<script>
+    var apiHost = "//api.guoshikai.com/";
+    $(function(){
+        $(document).scroll(scrollListener);
+        scrollListener();
+        webSocketInit();
+        $(".back-top").click(function(){
+            $("body").animate({ scrollTop: 0 }, 200);
+        });
+        // 注册或登录
+        $(document).on("click", ".offline a,.online a", accountHandlers);
+        $(document).on("click", ".online a", function(){
+            var type = $(this).attr("data-type");
+            switch(type){
+                case "logout":
+                    Cookies.remove("sign");
+                    sign = null;
+                    $(".online,.main").hide();
+                    $(".offline").fadeIn();
+                    if(null !== ws) {
+                        ws.close();
+                    }
+                    return;
+            }
+        });
+        $(document).on("click", "#send", sendMsg);
+        $(document).on("keyup", "#text", function(e){
+            if(13 === e.which){
+                sendMsg();
+            }
+        });
+
+        $(document).on("click", ".chat-panel .chat-board .send-user", function(){
+            var user = $(this).text();
+            $("#text").val("\\r "+user+" "+$("#text").val());
+            $("#text").focus();
+        });
+    });
+</script>
+<script>
+    function sendMsg(){
+        var text = $("#text");
+        if("" === $.trim(text.val())){
+            return false;
+        }
+        sendFrame({
+            type: "message",
+            sign: Cookies.get('sign'),
+            msg: text.val()
+        });
+        text.val("").focus();
+    }
+
+    function accountHandlers()
+    {
+        if(null === ws || 1 !== ws.readyState){
+//            layer.msg("WebSocket 未连接，请稍后重试。");
+            webSocketInit();
+        }
+        var type = $(this).attr("data-type");
+        switch (type) {
+            case "register":
+            case "login":
+                layer.prompt({
+                    title: 'Enter your username:',
+                    formType: 0,
+                    maxlength: 16,
+                    id: 'username'
+                }, function (username, index) {
+                    layer.close(index);
+                    layer.prompt({
+                        title: 'Enter your password:',
+                        formType: 1,
+                        id: 'password'
+                    }, function (password, index) {
+                        if(password.length < 1){
+                            layer.msg("密码至少1位");
+                            return false;
+                        }
+                        sendFrame({
+                            type: type,
+                            username: username,
+                            password: password
+                        });
+                        layer.close(index);
+                    });
+                });
+                return;
+            case "logout":
+                return;
+        }
+    }
+    function appendMessage(msg){
+        $(".chat-board").append(msg + "<br>");
+        $(".chat-board").scrollTop($(".chat-board")[0].scrollHeight);
+    }
+</script>
+<script>
+    var navHeight = false;
+    var navStatus = false;
+    function scrollListener(){
+        var documentScrollTop = $(document).scrollTop();
+        /* nav */
+        navHeight = navHeight || $("nav").offset().top + 1;
+        var f = documentScrollTop > navHeight;
+        if(f !== navStatus){
+            navStatus = f;
+            $("nav,.blank").toggleClass("nav-pin");
+            $(".back-top").fadeToggle(200);
+        }
+    }
+
+    var ws  = null;
+    var url = "ws://api.guoshikai.com:64377";
+    function webSocketInit(){
+        try {
+            ws = new WebSocket(url);
+            console.log(ws);
+            ws.onopen = function (f){
+                // 检查是否有sign 有则先校验一次
+                var sign = Cookies.get('sign');
+                if("undefined" !== typeof sign) {
+                    sendFrame({
+                        type: "check",
+                        sign: sign
+                    });
+                }else{
+                    $(".offline").fadeIn();
+                }
+            };
+            ws.onmessage = function (f) {
+                var data = $.parseJSON(f.data);
+                switch(data.type){
+                    case "check":
+                        return check(data);
+                    case "register":
+                    case "login":
+                        return validate(data);
+                    case "message":
+                        return onMessage(data);
+                    case "close":
+                        return ws.close();
+                    case "system":
+                        return onSystem(data);
+                    case "online":
+                        return onOnline(data);
+                    default:
+                        return;
+                }
+            };
+            ws.onclose = function (msg) {
+                appendMessage("connection closed.");
+            };
+            // 超时 5s内没连接成功就断开
+            setTimeout(function(){
+                if(1 !== ws.readyState){
+                    ws.close();
+                    var confirm = layer.confirm('WebSocket连接超时，是否重连？', {
+                        btn: ['是','否']
+                    }, function(){
+                        layer.close(confirm);
+                        webSocketInit();
+                    });
+                }
+            }, 5000);
+        }
+        catch (ex) {
+            console.log(ex);
+        }
+    }
+    function onMessage(data){
+        msg = data.user + ":" + data.msg;
+        var record = Cookies.get('msg_record')||"";
+        record+=msg+"<br>";
+        Cookies.set('msg_record', record);
+        appendMessage(msg);
+    }
+    function onSystem(data){
+        switch(data.state){
+            case "join":
+                var d = {list:[data.user]};
+                var tpl = $("#onlineListTpl").text();
+                var html = juicer(tpl, d);
+                $(".online-list>ul").append(html);
+                return appendMessage(data.user + " is joined.");
+            case "leave":
+                $(".online-list>ul .u_"+data.user).parent().remove();
+                return appendMessage(data.user + " is leave.");
+            default:
+                return appendMessage(data.msg);
+        }
+    }
+    function onOnline(data){
+        var tpl  = $("#onlineListTpl").text();
+        var html = juicer(tpl, data);
+        $(".online-list>ul").html(html);
+    }
+
+    function check(data){
+        if("failed" === data.state){
+            $(".online,.main").hide();
+            $(".offline").fadeIn();
+            Cookies.remove("sign");
+            sign = null;
+            return layer.msg(data.msg);
+        }
+        sendFrame({
+            type: "online",
+            sign: data.sign
+        });
+        var record = Cookies.get("msg_record");
+        $('.chat-board').html(record);
+        $(".chat-board").scrollTop($(".chat-board")[0].scrollHeight);
+        Cookies.set("sign", data.sign);
+        $(".online>label").html(data.user);
+        $(".offline").hide();
+        $(".online,.main").fadeIn();
+    }
+
+    function validate(data){
+        if("success" !== data.state){
+            return layer.msg(data.msg);
+        }
+        sendFrame({
+            type: "check",
+            sign: data.sign
+        });
+    }
+    // 统一发送方法
+    function sendFrame(f){
+        try {
+            ws.send(JSON.stringify(f));
+        }catch (ex) {
+            console.log(ex);
+        }
+    }
+</script>
+</body>
+</html>
