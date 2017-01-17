@@ -160,7 +160,7 @@
 
         $(document).on("click", ".chat-panel .chat-board .send-user", function(){
             var user = $(this).text();
-            $("#text").val("\\r "+user+" "+$("#text").val());
+            $("#text").val("\\r " + user + " " + $("#text").val());
             $("#text").focus();
         });
     });
@@ -243,7 +243,6 @@
     function webSocketInit(){
         try {
             ws = new WebSocket(url);
-            console.log(ws);
             ws.onopen = function (f){
                 // 检查是否有sign 有则先校验一次
                 var sign = Cookies.get('sign');
@@ -297,23 +296,23 @@
         }
     }
     function onMessage(data){
-        msg = data.user + ":" + data.msg;
+        msg = data.username + ":" + data.msg;
         var record = Cookies.get('msg_record')||"";
-        record+=msg+"<br>";
+        record += msg + "<br>";
         Cookies.set('msg_record', record);
         appendMessage(msg);
     }
     function onSystem(data){
         switch(data.state){
             case "join":
-                var d = {list:[data.user]};
-                var tpl = $("#onlineListTpl").text();
+                var d    = {list:[data.username]};
+                var tpl  = $("#onlineListTpl").text();
                 var html = juicer(tpl, d);
                 $(".online-list>ul").append(html);
-                return appendMessage(data.user + " is joined.");
+                return appendMessage(data.username + " is joined.");
             case "leave":
-                $(".online-list>ul .u_"+data.user).parent().remove();
-                return appendMessage(data.user + " is leave.");
+                $(".online-list>ul .u_" + data.username).parent().remove();
+                return appendMessage(data.username + " is leave.");
             default:
                 return appendMessage(data.msg);
         }
@@ -325,7 +324,7 @@
     }
 
     function check(data){
-        if("failed" === data.state){
+        if(0 !== data.code){
             $(".online,.main").hide();
             $(".offline").fadeIn();
             Cookies.remove("sign");
@@ -346,7 +345,7 @@
     }
 
     function validate(data){
-        if("success" !== data.state){
+        if(0 !== data.code){
             return layer.msg(data.msg);
         }
         sendFrame({
