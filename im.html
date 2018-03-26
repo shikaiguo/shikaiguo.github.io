@@ -126,6 +126,7 @@
 <script src="/lib/layer/layer.js"></script>
 <script src="/lib/juicer/juicer-min.js"></script>
 <script src="/lib/js/js.cookie-2.1.3.min.js"></script>
+<script src="https://cdn.bootcss.com/crypto-js/3.1.9/crypto-js.min.js"></script>
 <script>
     var apiHost = "//api.guoshikai.com/";
     $(function(){
@@ -166,15 +167,29 @@
     });
 </script>
 <script>
+    var key = null;
+    function getKey(){
+        if (null === key){
+            $.ajax({
+                url: 'https://file.guoshikai.com/key',
+                async: false,
+                success: function(r){
+                    key = r;
+                }
+            });
+        }
+        return key;
+    }
     function sendMsg(){
         var text = $("#text");
         if("" === $.trim(text.val())){
             return false;
         }
+        var msg = CryptoJS.AES.encrypt(text.val(), getKey()).toString();
         sendFrame({
             type: "message",
             sign: Cookies.get('sign'),
-            msg: text.val()
+            msg: msg
         });
         text.val("").focus();
     }
@@ -240,6 +255,7 @@
 
     var ws  = null;
     var url = "ws://api.guoshikai.com:64377";
+    var heartBeat = null;
     function webSocketInit(){
         try {
             ws = new WebSocket(url);
@@ -254,6 +270,9 @@
                 }else{
                     $(".offline").fadeIn();
                 }
+                heartBeat = setInterval(function(){
+                    ws.send("heartBeat");
+                }, 10000);
             };
             ws.onmessage = function (f) {
                 var data = $.parseJSON(f.data);
@@ -277,6 +296,7 @@
             };
             ws.onclose = function (msg) {
                 appendMessage("connection closed.");
+                clearInterval(heartBeat);
             };
             // 超时 5s内没连接成功就断开
             setTimeout(function(){
@@ -296,7 +316,8 @@
         }
     }
     function onMessage(data){
-        msg = data.username + ":" + data.msg;
+        var msg = CryptoJS.AES.decrypt(data.msg, getKey()).toString(CryptoJS.enc.Utf8);
+        msg = data.username + ":" + msg;
         var record = Cookies.get('msg_record')||"";
         record += msg + "<br>";
         Cookies.set('msg_record', record);
