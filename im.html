@@ -329,10 +329,18 @@
                 var tpl  = $("#onlineListTpl").text();
                 var html = juicer(tpl, d);
                 $(".online-list>ul").append(html);
-                return appendMessage(data.username + " is joined.");
+                var record = sessionStorage.getItem('msg_record')||"";
+                var msg = data.username + " is joined.";
+                record += msg + "<br>";
+                sessionStorage.setItem('msg_record', record);
+                return appendMessage(msg);
             case "leave":
                 $(".online-list>ul .u_" + data.username).parent().remove();
-                return appendMessage(data.username + " is leave.");
+                    var record = sessionStorage.getItem('msg_record')||"";
+                    var msg = data.username + " is leave.";
+                    record += msg + "<br>";
+                    sessionStorage.setItem('msg_record', record);
+                    return appendMessage(msg);
             default:
                 return appendMessage(data.msg);
         }
