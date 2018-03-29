@@ -261,7 +261,7 @@
             ws.onopen = function (f){
                 // 检查是否有sign 有则先校验一次
                 var sign = sessionStorage.getItem('sign');
-                if("undefined" !== typeof sign) {
+                if(null !== sign) {
                     sendFrame({
                         type: "check",
                         sign: sign
@@ -356,7 +356,6 @@
             $(".online,.main").hide();
             $(".offline").fadeIn();
             sessionStorage.removeItem("sign");
-            sign = null;
             return layer.msg(data.msg);
         }
         sendFrame({
